@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict, Counter
 import json
 
@@ -8,6 +8,8 @@ app = Flask(__name__)
 
 # Codeforces API base URL
 CODEFORCES_API_URL = "https://codeforces.com/api"
+
+dhaka_tz = timezone(timedelta(hours=6))
 
 def calculate_streak(submissions):
     if not submissions:
@@ -19,7 +21,7 @@ def calculate_streak(submissions):
     # Convert timestamps to dates
     dates = set()
     for submission in sorted_submissions:
-        date = datetime.fromtimestamp(submission['creationTimeSeconds']).date()
+        date = datetime.fromtimestamp(submission['creationTimeSeconds'], dhaka_tz).date()
         dates.add(date)
     
     # Calculate streak
@@ -89,12 +91,12 @@ def get_daily_solved_stats(submissions, time_range='30days'):
     # Track solved problems by date
     for submission in sorted_submissions:
         if submission['verdict'] == 'OK':
-            date = datetime.fromtimestamp(submission['creationTimeSeconds']).date()
+            date = datetime.fromtimestamp(submission['creationTimeSeconds'], dhaka_tz).date()
             problem_id = f"{submission['problem']['contestId']}{submission['problem']['index']}"
             daily_solved[date].add(problem_id)
     
     # Get the date range based on the selected option
-    end_date = datetime.now().date()
+    end_date = datetime.now(dhaka_tz).date()
     if time_range == '30days':
         start_date = end_date - timedelta(days=29)  # 29 days ago to include today
         # Create a list of all dates in the range
@@ -153,14 +155,14 @@ def get_daily_solved_stats(submissions, time_range='30days'):
         while current_date <= end_date:
             # Calculate the start of the 4-month period
             if current_date.month <= 4:
-                quarter_start = datetime(current_date.year, 1, 1).date()  # Jan
-                quarter_end = datetime(current_date.year, 4, 30).date()   # Apr
+                quarter_start = datetime(current_date.year, 1, 1, tzinfo=dhaka_tz).date()  # Jan
+                quarter_end = datetime(current_date.year, 4, 30, tzinfo=dhaka_tz).date()   # Apr
             elif current_date.month <= 8:
-                quarter_start = datetime(current_date.year, 5, 1).date()  # May
-                quarter_end = datetime(current_date.year, 8, 31).date()   # Aug
+                quarter_start = datetime(current_date.year, 5, 1, tzinfo=dhaka_tz).date()  # May
+                quarter_end = datetime(current_date.year, 8, 31, tzinfo=dhaka_tz).date()   # Aug
             else:
-                quarter_start = datetime(current_date.year, 9, 1).date()  # Sep
-                quarter_end = datetime(current_date.year, 12, 31).date()  # Dec
+                quarter_start = datetime(current_date.year, 9, 1, tzinfo=dhaka_tz).date()  # Sep
+                quarter_end = datetime(current_date.year, 12, 31, tzinfo=dhaka_tz).date()  # Dec
             
             if quarter_end > end_date:
                 quarter_end = end_date
@@ -172,11 +174,11 @@ def get_daily_solved_stats(submissions, time_range='30days'):
             
             # Move to next 4-month period
             if current_date.month <= 4:
-                current_date = datetime(current_date.year, 5, 1).date()
+                current_date = datetime(current_date.year, 5, 1, tzinfo=dhaka_tz).date()
             elif current_date.month <= 8:
-                current_date = datetime(current_date.year, 9, 1).date()
+                current_date = datetime(current_date.year, 9, 1, tzinfo=dhaka_tz).date()
             else:
-                current_date = datetime(current_date.year + 1, 1, 1).date()
+                current_date = datetime(current_date.year + 1, 1, 1, tzinfo=dhaka_tz).date()
         
         # Convert to list format
         quarterly_data = []
@@ -196,13 +198,13 @@ def get_submission_heatmap(submissions, year=None):
     })
     
     # Get current date for default year selection
-    current_date = datetime.now()
+    current_date = datetime.now(dhaka_tz)
     if year is None:
         year = current_date.year - 1  # Default to last year
     
     # Process submissions
     for submission in submissions:
-        date = datetime.fromtimestamp(submission['creationTimeSeconds']).date()
+        date = datetime.fromtimestamp(submission['creationTimeSeconds'], dhaka_tz).date()
         # Only include submissions from the selected year
         if date.year == year:
             date_str = date.isoformat()
@@ -259,7 +261,7 @@ def get_submission_stats(handle):
             return jsonify({"error": "Failed to fetch submissions"}), 404
 
         # Get today's date in seconds since epoch
-        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(dhaka_tz).replace(hour=0, minute=0, second=0, microsecond=0)
         today_seconds = int(today.timestamp())
 
         # Initialize statistics
@@ -395,7 +397,7 @@ def compare_handles():
                 continue
                 
             # Get today's stats
-            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            today = datetime.now(dhaka_tz).replace(hour=0, minute=0, second=0, microsecond=0)
             today_seconds = int(today.timestamp())
             
             today_stats = {
@@ -476,4 +478,4 @@ def get_heatmap_data(handle, year):
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0',debug=True) 
+    app.run(debug=True) 
