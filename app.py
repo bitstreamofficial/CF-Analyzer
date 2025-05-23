@@ -198,18 +198,21 @@ def get_submission_heatmap(submissions, year=None):
     })
     
     # Get current date for default year selection
-    current_date = datetime.now()
+    current_date = datetime.now(dhaka_tz)
+    end_date = current_date.date()
+    
+    # If no year specified, get last 365 days
     if year is None:
-        start_date = end_date - timedelta(days=365)  # Changed from 364 to 365 to include today
+        start_date = end_date - timedelta(days=364)  # 364 days ago to include today
     else:
         start_date = datetime(year, 1, 1, tzinfo=dhaka_tz).date()
         end_date = datetime(year, 12, 31, tzinfo=dhaka_tz).date()
     
     # Process submissions
     for submission in submissions:
-        date = datetime.fromtimestamp(submission['creationTimeSeconds']).date()
-        # Only include submissions from the selected year
-        if date.year == year:
+        date = datetime.fromtimestamp(submission['creationTimeSeconds'], dhaka_tz).date()
+        # Only include submissions within the date range
+        if start_date <= date <= end_date:
             date_str = date.isoformat()
             heatmap_data[date_str]['total'] += 1
             if submission['verdict'] == 'OK':
@@ -481,4 +484,4 @@ def get_heatmap_data(handle, year):
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0',debug=True) 
+    app.run(debug=True) 

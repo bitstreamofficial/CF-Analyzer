@@ -636,7 +636,7 @@ document.getElementById('handleForm').addEventListener('submit', async function(
 
                     // Find the first Sunday of the year or 365 days ago
                     const today = new Date();
-                    const firstDay = year ? new Date(year, 0, 1) : new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
+                    const firstDay = year ? new Date(year, 0, 1) : new Date(today.getTime() - 364 * 24 * 60 * 60 * 1000);
                     const firstSunday = new Date(firstDay);
                     while (firstSunday.getDay() !== 0) firstSunday.setDate(firstSunday.getDate() + 1);
                     
