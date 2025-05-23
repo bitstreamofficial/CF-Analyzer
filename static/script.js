@@ -51,7 +51,7 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                                 <div class="card-body">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <h3 class="mb-0">${userData.handle}</h3>
+                                            <h3 class="mb-0"><a href="https://codeforces.com/profile/${userData.handle}" target="_blank" class="text-decoration-none">${userData.handle}</a></h3>
                                             <p class="text-muted mb-0">${userData.rank || 'Unrated'} - ${userData.rating || 'Unrated'}</p>
                                         </div>
                                         <div class="text-end">
@@ -584,24 +584,38 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                     const yearSelector = document.createElement('select');
                     yearSelector.className = 'form-select mb-3';
                     yearSelector.style.width = '200px';
+                    
+                    // Add "Last 365 Days" option
+                    const lastYearOption = document.createElement('option');
+                    lastYearOption.value = 'last365';
+                    lastYearOption.textContent = 'Last 365 Days';
+                    lastYearOption.selected = true;
+                    yearSelector.appendChild(lastYearOption);
+                    
+                    // Add year options
                     for (let year = currentYear; year >= 2010; year--) {
                         const option = document.createElement('option');
                         option.value = year;
                         option.textContent = year;
-                        if (year === currentYear) option.selected = true;
                         yearSelector.appendChild(option);
                     }
+                    
                     yearSelector.addEventListener('change', async function() {
-                        const selectedYear = parseInt(this.value);
+                        const selectedValue = this.value;
                         const handle = document.getElementById('handles').value.trim();
                         try {
-                            const response = await fetch(`/api/heatmap/${handle}/${selectedYear}`);
+                            let response;
+                            if (selectedValue === 'last365') {
+                                response = await fetch(`/api/heatmap/${handle}`);
+                            } else {
+                                response = await fetch(`/api/heatmap/${handle}/${selectedValue}`);
+                            }
                             const data = await response.json();
-                            if (response.ok) createHeatmapGrid(data, selectedYear, true);
+                            if (response.ok) createHeatmapGrid(data, selectedValue === 'last365' ? null : parseInt(selectedValue), true);
                         } catch (error) { console.error('Error fetching heatmap data:', error); }
                     });
                     heatmapContainer.appendChild(yearSelector);
-                    createHeatmapGrid(heatmapData, currentYear, false);
+                    createHeatmapGrid(heatmapData, null, false);
                 }
 
                 function createHeatmapGrid(heatmapData, year, showFullYear = false) {
@@ -620,20 +634,19 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                     const dataMap = {};
                     heatmapData.forEach(item => { dataMap[item.date] = item; });
 
-                    // Find the first Sunday of the year
-                    const firstDay = new Date(year, 0, 1);
+                    // Find the first Sunday of the year or 365 days ago
+                    const today = new Date();
+                    const firstDay = year ? new Date(year, 0, 1) : new Date(today.getTime() - 365 * 24 * 60 * 60 * 1000);
                     const firstSunday = new Date(firstDay);
                     while (firstSunday.getDay() !== 0) firstSunday.setDate(firstSunday.getDate() + 1);
+                    
                     // Find the last day to display
                     let lastDay;
-                    if (showFullYear) {
+                    if (showFullYear && year) {
                         lastDay = new Date(year, 11, 31);
                     } else {
-                        // Up to today if current year
-                        const today = new Date();
-                        lastDay = (today.getFullYear() === year) ? today : new Date(year, 11, 31);
+                        lastDay = today;
                     }
-                    const todayStr = new Date().toISOString().slice(0, 10);
 
                     // Build a 2D array: weeks x days
                     const weeks = [];
@@ -642,7 +655,7 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                         const week = [];
                         for (let d = 0; d < 7; d++) {
                             const date = new Date(current);
-                            week.push(date.getFullYear() === year && date <= lastDay ? date.toISOString().slice(0, 10) : null);
+                            week.push(date.getFullYear() === (year || today.getFullYear()) && date <= lastDay ? date.toISOString().slice(0, 10) : null);
                             current.setDate(current.getDate() + 1);
                         }
                         weeks.push(week);
@@ -698,7 +711,7 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                     // Year label (left)
                     const yearLabel = document.createElement('div');
                     yearLabel.className = 'heatmap-year-label';
-                    yearLabel.textContent = year;
+                    yearLabel.textContent = year || 'Last 365 Days';
                     yearLabel.style.fontSize = '2rem';
                     yearLabel.style.color = '#b0b0b0';
                     yearLabel.style.fontWeight = 'bold';
@@ -738,7 +751,7 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                                 if (lastMonth !== null) {
                                     const th = document.createElement('th');
                                     th.colSpan = colSpan;
-                                    th.textContent = new Date(year, lastMonth, 1).toLocaleString('en-US', { month: 'short' });
+                                    th.textContent = new Date(year || today.getFullYear(), lastMonth, 1).toLocaleString('en-US', { month: 'short' });
                                     th.style.fontSize = '12px';
                                     th.style.color = '#666';
                                     th.style.textAlign = 'center';
@@ -759,7 +772,7 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                     if (lastMonth !== null) {
                         const th = document.createElement('th');
                         th.colSpan = colSpan;
-                        th.textContent = new Date(year, lastMonth, 1).toLocaleString('en-US', { month: 'short' });
+                        th.textContent = new Date(year || today.getFullYear(), lastMonth, 1).toLocaleString('en-US', { month: 'short' });
                         th.style.fontSize = '12px';
                         th.style.color = '#666';
                         th.style.textAlign = 'center';
@@ -833,10 +846,12 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                                         tooltip.style.zIndex = 9999;
                                         document.body.appendChild(tooltip);
                                     }
-                                    tooltip.innerHTML = `<div style='font-size:16px;font-weight:bold;margin-bottom:4px;'>${new Date(dateStr).toLocaleDateString()}</div>` +
-                                        `<div>Total Submissions: <b>${dObj.total}</b></div>` +
-                                        `<div>Accepted: <b>${dObj.accepted}</b></div>` +
-                                        `<div>Unique Problems Solved: <b>${dObj.unique_solved}</b></div>`;
+                                    tooltip.innerHTML = `
+                                        <div style='font-size:16px;font-weight:bold;margin-bottom:4px;'>${new Date(dateStr).toLocaleDateString()}</div>
+                                        <div style='margin-bottom:2px;'>Total Submissions: <b>${dObj.total}</b></div>
+                                        <div style='margin-bottom:2px;'>Accepted Solutions: <b>${dObj.accepted}</b></div>
+                                        <div>Unique Problems Solved: <b>${dObj.unique_solved}</b></div>
+                                    `;
                                     const rect = td.getBoundingClientRect();
                                     tooltip.style.left = (rect.left + window.scrollX + rect.width + 10) + 'px';
                                     tooltip.style.top = (rect.top + window.scrollY - 10) + 'px';
@@ -989,13 +1004,14 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                                             <th>Total Submissions</th>
                                             <th>Last Submission</th>
                                             <th>Rating</th>
+                                            <th>Last Active</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${todayLeaderboard.map((user, index) => `
                                             <tr class="rank-${index + 1}">
                                                 <td>${index + 1}</td>
-                                                <td>${user.handle}</td>
+                                                <td><a href="https://codeforces.com/profile/${user.handle}" target="_blank" class="text-decoration-none">${user.handle}</a></td>
                                                 <td>${user.today_stats.solved_problems}</td>
                                                 <td>${user.today_stats.total_submissions}</td>
                                                 <td>
@@ -1011,6 +1027,7 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                                                     ` : 'No submissions today'}
                                                 </td>
                                                 <td>${user.user_info.rating || 'Unrated'}</td>
+                                                <td>${getRelativeTimeString(user.last_active?.time * 1000)}</td>
                                             </tr>
                                         `).join('')}
                                     </tbody>
@@ -1033,18 +1050,20 @@ document.getElementById('handleForm').addEventListener('submit', async function(
                                             <th>Current Streak</th>
                                             <th>Avg. Attempts/AC</th>
                                             <th>Rating</th>
+                                            <th>Last Active</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${allTimeLeaderboard.map((user, index) => `
                                             <tr class="rank-${index + 1}">
                                                 <td>${index + 1}</td>
-                                                <td>${user.handle}</td>
+                                                <td><a href="https://codeforces.com/profile/${user.handle}" target="_blank" class="text-decoration-none">${user.handle}</a></td>
                                                 <td>${user.all_time_stats.total_solved}</td>
                                                 <td>${user.all_time_stats.total_submissions}</td>
                                                 <td>${user.all_time_stats.streak} days</td>
                                                 <td>${user.all_time_stats.avg_attempts_per_ac.toFixed(2)}</td>
                                                 <td>${user.user_info.rating || 'Unrated'}</td>
+                                                <td>${getRelativeTimeString(user.last_active?.time * 1000)}</td>
                                             </tr>
                                         `).join('')}
                                     </tbody>
@@ -1127,9 +1146,22 @@ document.getElementById('handleForm').addEventListener('submit', async function(
 });
 
 function getRelativeTimeString(timestamp) {
+    if (!timestamp) return 'Unknown';
+    
     const now = new Date();
     const date = new Date(timestamp);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+        return 'Unknown';
+    }
+    
     const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    // If less than 5 minutes ago, consider user as online
+    if (diffInSeconds < 300) {
+        return '<span class="text-success fw-bold">Active Now</span>';
+    }
     
     if (diffInSeconds < 60) {
         return 'just now';

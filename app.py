@@ -198,13 +198,16 @@ def get_submission_heatmap(submissions, year=None):
     })
     
     # Get current date for default year selection
-    current_date = datetime.now(dhaka_tz)
+    current_date = datetime.now()
     if year is None:
-        year = current_date.year - 1  # Default to last year
+        start_date = end_date - timedelta(days=365)  # Changed from 364 to 365 to include today
+    else:
+        start_date = datetime(year, 1, 1, tzinfo=dhaka_tz).date()
+        end_date = datetime(year, 12, 31, tzinfo=dhaka_tz).date()
     
     # Process submissions
     for submission in submissions:
-        date = datetime.fromtimestamp(submission['creationTimeSeconds'], dhaka_tz).date()
+        date = datetime.fromtimestamp(submission['creationTimeSeconds']).date()
         # Only include submissions from the selected year
         if date.year == year:
             date_str = date.isoformat()
